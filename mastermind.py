@@ -1,9 +1,13 @@
 import numpy.random as random
 import time
 
+# Generation of a random board
 def generate_random(size, nbcolors):
 	return [int((nbcolors - 1) * random.random() + 1) for i in xrange(size)]
 
+# Generation of a first try
+# In the case of a game of : size = 4, color = 7, it will generate the following board : [1,2,3,4]
+# This is used to maximise the information from the first try
 def generate_one_each(size, nbcolors):
 	essai = []
 	for i in xrange(size):
@@ -19,6 +23,7 @@ def first_try(size, nbcolors, solution):
 	
 	return [[essai1, indices]];
 
+# Maximizing the second try based on the information of the first one
 def second_try(size, nbcolors, board, solution):
 	indices1 = board[0][1] 
 	essai1 = board[0][0]
@@ -47,6 +52,7 @@ def second_try(size, nbcolors, board, solution):
 
 	return [essai2, indices2];
 
+# Computing hints for the current row
 def generate_indices(size, nbcolors, essai, solution):
 	indices = []
 	nums_essai = [0] * nbcolors
@@ -97,6 +103,7 @@ def essai_valid(size, nbcolors, board, essai, tested):
 
 	return True;	
 
+# After the first two trys, this will generate a row that verifies all the previous equations
 def find_answer(size, nbcolors, board, solution, tested):
 	essaiX = generate_random(size, nbcolors)
 
@@ -121,6 +128,7 @@ def single_game(size, nbcolors):
 	
 	return [len(board), time.time() - start_simluation];
 
+# Basic sum function for intergers and floats
 def sum(dataset):
 	dataset_sum = 0
 
@@ -129,9 +137,11 @@ def sum(dataset):
 
 	return dataset_sum
 
+# Basic average function for integer and floats
 def average(dataset):
 	return sum(dataset)/float(len(dataset));
 
+# Basic variance function for integer and floats
 def variance(dataset):
 	avg = average(dataset)
 	var_sum = 0
@@ -141,6 +151,7 @@ def variance(dataset):
 	
 	return var_sum/float(len(dataset));
 
+# Calculation of the performance lengthwise and timewise
 def print_stats(stats):	
 	lengths = []
 	times = []
@@ -155,7 +166,7 @@ def print_stats(stats):
 	print("Variance time : %s" % variance(times))
 
 start_time = time.time()
-simulations = 1000
+simulations = 1
 size = 4
 nbcolors = 7
 
