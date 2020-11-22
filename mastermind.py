@@ -1,180 +1,174 @@
-import numpy.random as random
-import time
+'''
+TODO
+'''
 
-# Generation of a random board
-def generate_random(size, nbcolors):
-	return [int((nbcolors - 1) * random.random() + 1) for i in xrange(size)]
+import time
+import argparse
+from collections import namedtuple
+
+import numpy as np
+from tqdm import tqdm
+from scipy.stats import norm
+
+parser = argparse.ArgumentParser("mastermind")
+parser.add_argument("--num_simulations", "-n", dest="num_simulations", type=int, default=1)
+parser.add_argument("--board-size", "-s", dest="board_size", type=int, default=4)
+parser.add_argument("--num-colors", "-c", dest="num_colors", type=int, default=7)
+
+args = parser.parse_args()
+
+num_simulations = args.num_simulations
+board_size = args.board_size
+num_colors = args.num_colors
+
+FinishedGame = namedtuple('FinishedGame', 'trials, speed')
+board = []
+
+def generate_random_trial():
+    '''
+    TODO
+    '''
+    return np.random.randint(low=1, high=num_colors, size=board_size)
+
+def generate_empty_trial():
+    '''
+    TODO
+    '''
+    return np.zeros(shape=board_size, dtype=int)
+
+def count_per_color(trial):
+    '''
+    TODO
+    '''
+    return np.bincount(trial, minlength=num_colors)
 
 # Generation of a first try
 # In the case of a game of : size = 4, color = 7, it will generate the following board : [1,2,3,4]
 # This is used to maximise the information from the first try
-def generate_one_each(size, nbcolors):
-	essai = []
-	for i in xrange(size):
-		if i < nbcolors:
-			essai.append(i+1)
-		else:
-			essai.append(nbcolors)
-	return essai
-
-def first_try(size, nbcolors, solution):
-	essai1 = generate_one_each(size, nbcolors)
-	indices = generate_indices(size, nbcolors, essai1, solution)
-	
-	return [[essai1, indices]];
+def generate_first_trial():
+    '''
+    TODO
+    '''
+    return np.minimum(np.arange(start=1, stop=board_size + 1), np.full(shape=board_size, fill_value=num_colors))
 
 # Maximizing the second try based on the information of the first one
-def second_try(size, nbcolors, board, solution):
-	indices1 = board[0][1] 
-	essai1 = board[0][0]
-	essai2 = [-1] * size
-	noirs = indices1.count(2)
-	blancs = indices1.count(1)
+def generate_second_trial():
+    '''
+    TODO
+    '''
+    last_trial = board[-1]['trial']
+    last_hints = board[-1]['hints']
+    cor_col = last_hints['correct_color']
+    cor_col_pos = last_hints['correct_color_position']
 
-	for i in xrange(noirs):
-		essai2[i] = essai1[i]
+    next_trial = generate_empty_trial()
+    next_trial[:cor_col_pos] = last_trial[:cor_col_pos]
+    for pos in range(cor_col_pos, cor_col_pos + cor_col):
+        if pos+1 < board_size:
+            next_trial[pos+1] = last_trial[pos]
+        else:
+            next_trial[cor_col_pos] = last_trial[pos]
 
-	for i in xrange(noirs, noirs + blancs):
-		if i + 1 > (size - 1):
-			next_indice = noirs
-		else:
-			next_indice = i + 1
-		essai2[next_indice] = essai1[i]
+    for i, keg in enumerate(next_trial):
+        if not keg:
+            if board_size < num_colors:
+                next_trial[i] = np.random.randint(low=board_size+1, high=num_colors)
+            else:
+                next_trial[i] = np.random.randint(low=1, high=num_colors-1)
 
-	for a in essai2:
-		if a == -1:
-			if size < nbcolors:
-				essai2[essai2.index(a)] = int((nbcolors - size) * random.random() + size + 1)
-			else:
-				essai2[essai2.index(a)] = int((nbcolors - 1) * random.random() + 1)
-
-	indices2 = generate_indices(size, nbcolors, essai2, solution)
-
-	return [essai2, indices2];
+    return next_trial
 
 # Computing hints for the current row
-def generate_indices(size, nbcolors, essai, solution):
-	indices = []
-	nums_essai = [0] * nbcolors
-	nums_solution = [0] * nbcolors
-	
-	for a in essai: 
-		nums_essai[a - 1] += 1
+def compute_hints(trial, solution):
+    '''
+    TODO
+    '''
 
-	for a in solution: 
-		nums_solution[a - 1] += 1
+    hints = {
+        'correct_color': 0,
+        'correct_color_position': 0,
+    }
 
-	for a,b in zip(nums_essai, nums_solution):
-		for x in xrange(min(a,b)):
-			indices.append(1)
+    hints['correct_color'] = np.minimum(count_per_color(trial), count_per_color(solution)).sum()
 
-	for a,b in zip(essai, solution):
-		if a == b:
-			indices[indices.index(1)] = 2
-			
-	return indices;
+    for peg_trial, peg_solution in zip(trial, solution):
+        if peg_trial == peg_solution:
+            hints['correct_color'] -= 1
+            hints['correct_color_position'] += 1
 
-def essai_valid(size, nbcolors, board, essai, tested):
+    return hints
 
-	nums_essai = [0] * nbcolors
-	for a in essai:
-		nums_essai[a - 1] += 1
+def validate_trial(trial):
+    '''
+    TODO
+    '''
 
-	for ligne in board:
-		nums_past = [0] * nbcolors
-		indices = []
+    for line in reversed(board):
+        past_trial = line['trial']
+        past_hints = line['hints']
 
-		for a in ligne[0]:
-			nums_past[a - 1] += 1
+        hypotetical_hints = compute_hints(trial, past_trial)
+        if past_hints != hypotetical_hints:
+            return False
 
-		for a,b in zip(nums_essai, nums_past):
-			for x in xrange(min(a,b)):
-				indices.append(1)	
-
-		if len(indices) != len(ligne[1]):
-			return False; 
-
-		for past_pion, futur_pion in zip(ligne[0], essai):
-			if past_pion == futur_pion:
-				indices[indices.index(1)] = 2
-		
-		if indices.count(2) != ligne[1].count(2):
-			return False;
-
-	return True;	
+    return True
 
 # After the first two trys, this will generate a row that verifies all the previous equations
-def find_answer(size, nbcolors, board, solution, tested):
-	essaiX = generate_random(size, nbcolors)
+def generate_trial():
+    '''
+    TODO
+    '''
 
-	while essai_valid(size, nbcolors, board, essaiX, tested) != True:
-		tested.append(essaiX)
-		essaiX = generate_random(size, nbcolors)
-	
-	indicesX = generate_indices(size, nbcolors, essaiX, solution)
-	
-	return [essaiX, indicesX];
+    yield generate_first_trial()
+    yield generate_second_trial()
+    while True:
+        trial = generate_random_trial()
+        if validate_trial(trial):
+            yield trial
 
-def single_game(size, nbcolors):
-	start_simluation = time.time()
-	solution = generate_random(size, nbcolors)
-	board = first_try(size, nbcolors, solution)
-	tested = []
+def process_trial(trial, solution):
+    '''
+    TODO
+    '''
+    line = {
+        'trial': trial,
+        'hints': compute_hints(trial, solution)
+    }
 
-	board.append(second_try(size, nbcolors, board, solution))
+    return line
 
-	while board[-1][1] != [2] * size:
-		board.append(find_answer(size, nbcolors, board, solution, tested))
-	
-	return [len(board), time.time() - start_simluation];
+def single_game():
+    '''
+    TODO
+    '''
+    global board
+    start_simluation = time.time()
 
-# Basic sum function for intergers and floats
-def sum(dataset):
-	dataset_sum = 0
+    solution = generate_random_trial()
+    board = []
+    for trial in generate_trial():
+        board.append(process_trial(trial, solution))
+        if board[-1]['hints']['correct_color_position'] == board_size:
+            break
 
-	for d in dataset:
-		dataset_sum += d;
+    return FinishedGame(trials=len(board), speed=time.time() - start_simluation)
 
-	return dataset_sum
+def print_game_stats(games):
+    '''
+    TODO
+    '''
+    mean_length, var_length = norm.fit([game[0] for game in games])
+    mean_time, var_time = norm.fit([game[1] for game in games])
 
-# Basic average function for integer and floats
-def average(dataset):
-	return sum(dataset)/float(len(dataset));
-
-# Basic variance function for integer and floats
-def variance(dataset):
-	avg = average(dataset)
-	var_sum = 0
-
-	for d in dataset:
-		var_sum += pow(d - avg, 2);
-	
-	return var_sum/float(len(dataset));
-
-# Calculation of the performance lengthwise and timewise
-def print_stats(stats):	
-	lengths = []
-	times = []
-
-	for s in stats:
-		lengths.append(s[0])
-		times.append(s[1])
-
-	print("Average length : %s" % average(lengths))
-	print("Variance length : %s" % variance(lengths))
-	print("Average time : %s" % average(times))
-	print("Variance time : %s" % variance(times))
+    print(f'Average length: {mean_length}')
+    print(f'Variance length: {var_length}')
+    print(f'Average time: {mean_time}')
+    print(f'Variance time: {var_time}')
 
 start_time = time.time()
-simulations = 1
-size = 4
-nbcolors = 7
 
-stats = []
+finished_games = [single_game() for _ in tqdm(range(num_simulations), desc = 'Processing simulations')]
 
-for i in xrange(simulations):
-	stats.append(single_game(size, nbcolors))
-
-print("Board of size %s which %s different colors" % (size, nbcolors))
-print_stats(stats)
-print("--- %s seconds ---" % (time.time() - start_time))
+print(f'Board of size {board_size} which {num_colors} different colors')
+print_game_stats(finished_games)
+print('--- {time.time() - start_time} seconds ---')
