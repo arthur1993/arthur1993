@@ -4,6 +4,7 @@ TODO
 
 import time
 import argparse
+from typing import Generator
 from collections import namedtuple
 
 import numpy as np
@@ -21,22 +22,22 @@ num_simulations = args.num_simulations
 board_size = args.board_size
 num_colors = args.num_colors
 
-FinishedGame = namedtuple('FinishedGame', 'trials, speed')
+FinishedGame = namedtuple('FinishedGame', 'trials speed')
 board = []
 
-def generate_random_trial():
+def generate_random_trial() -> np.ndarray:
     '''
     TODO
     '''
     return np.random.randint(low=1, high=num_colors, size=board_size)
 
-def generate_empty_trial():
+def generate_empty_trial() -> np.ndarray:
     '''
     TODO
     '''
     return np.zeros(shape=board_size, dtype=int)
 
-def count_per_color(trial):
+def count_per_color(trial: np.ndarray) -> np.ndarray:
     '''
     TODO
     '''
@@ -45,14 +46,14 @@ def count_per_color(trial):
 # Generation of a first try
 # In the case of a game of : size = 4, color = 7, it will generate the following board : [1,2,3,4]
 # This is used to maximise the information from the first try
-def generate_first_trial():
+def generate_first_trial() -> np.ndarray:
     '''
     TODO
     '''
-    return np.minimum(np.arange(start=1, stop=board_size + 1), np.full(shape=board_size, fill_value=num_colors))
+    return np.minimum(np.arange(start=1, stop=board_size+1), np.full(shape=board_size, fill_value=num_colors))
 
 # Maximizing the second try based on the information of the first one
-def generate_second_trial():
+def generate_second_trial() -> np.ndarray:
     '''
     TODO
     '''
@@ -79,7 +80,7 @@ def generate_second_trial():
     return next_trial
 
 # Computing hints for the current row
-def compute_hints(trial, solution):
+def compute_hints(trial: np.ndarray, solution: np.ndarray) -> dict:
     '''
     TODO
     '''
@@ -98,7 +99,7 @@ def compute_hints(trial, solution):
 
     return hints
 
-def validate_trial(trial):
+def validate_trial(trial: np.ndarray) -> bool:
     '''
     TODO
     '''
@@ -114,7 +115,7 @@ def validate_trial(trial):
     return True
 
 # After the first two trys, this will generate a row that verifies all the previous equations
-def generate_trial():
+def generate_trial() -> Generator[np.ndarray, None, None]:
     '''
     TODO
     '''
@@ -126,7 +127,7 @@ def generate_trial():
         if validate_trial(trial):
             yield trial
 
-def process_trial(trial, solution):
+def process_trial(trial: np.ndarray, solution: np.ndarray) -> dict[str, np.ndarray]:
     '''
     TODO
     '''
@@ -137,7 +138,7 @@ def process_trial(trial, solution):
 
     return line
 
-def single_game():
+def single_game() -> FinishedGame:
     '''
     TODO
     '''
@@ -149,26 +150,26 @@ def single_game():
     for trial in generate_trial():
         board.append(process_trial(trial, solution))
         if board[-1]['hints']['correct_color_position'] == board_size:
-            break
+            return FinishedGame(trials=len(board), speed=time.time() - start_simluation)
 
-    return FinishedGame(trials=len(board), speed=time.time() - start_simluation)
-
-def print_game_stats(games):
+def print_game_stats(games: list[FinishedGame]) -> None:
     '''
     TODO
     '''
-    mean_length, var_length = norm.fit([game[0] for game in games])
-    mean_time, var_time = norm.fit([game[1] for game in games])
+    mean_length, var_length = norm.fit([game.trials for game in games])
+    mean_time, var_time = norm.fit([game.speed for game in games])
 
-    print(f'Average length: {mean_length}')
-    print(f'Variance length: {var_length}')
-    print(f'Average time: {mean_time}')
-    print(f'Variance time: {var_time}')
+    print(f'Average length: {mean_length:.2}')
+    print(f'Variance length: {var_length:.2}')
+    print(f'Average time: {mean_time:.2}')
+    print(f'Variance time: {var_time:.2}')
 
-start_time = time.time()
 
-finished_games = [single_game() for _ in tqdm(range(num_simulations), desc = 'Processing simulations')]
+if __name__ == "__main__":
+    start_time = time.time()
 
-print(f'Board of size {board_size} which {num_colors} different colors')
-print_game_stats(finished_games)
-print('--- {time.time() - start_time} seconds ---')
+    finished_games = [single_game() for _ in tqdm(range(num_simulations), desc = 'Processing simulations')]
+
+    print(f'Board of size {board_size} which {num_colors} different colors')
+    print_game_stats(finished_games)
+    print(f'--- {time.time() - start_time:.2} seconds ---')
