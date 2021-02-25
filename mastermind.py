@@ -6,6 +6,7 @@ import time
 import argparse
 import itertools
 from collections import namedtuple
+from termcolor import colored
 
 import numpy as np
 from tqdm import tqdm
@@ -16,11 +17,16 @@ parser.add_argument('--num_simulations', '-n', dest='num_simulations', type=int,
 parser.add_argument('--board-size', '-s', dest='board_size', type=int, default=4)
 parser.add_argument('--num-colors', '-c', dest='num_colors', type=int, default=7)
 
+parser.add_argument('--display', '-d', dest='display', action='store_true')
+parser.set_defaults(display=False)
+
 args = parser.parse_args()
 
 num_simulations = args.num_simulations
 board_size = args.board_size
 num_colors = args.num_colors
+num_colors = args.num_colors
+display = args.display
 
 FinishedGame = namedtuple('FinishedGame', 'trials speed')
 board = []
@@ -96,13 +102,46 @@ def single_game() -> FinishedGame:
     board = []
     solution = generate_random_trial()
     possibilities = np.array(list(itertools.product(range(1, num_colors+1), repeat=board_size)))
-    while len(possibilities) > 1:
+    while True:
         trial = generate_random_trial_from_possibility(possibilities)
+        
         board.append(process_trial(trial, solution))
+        board[-1]['possibilities'] = len(possibilities)
+
         possibilities = update_possibilities(possibilities)
+        if board[-1]['hints']['correct_color_position'] == board_size:
+            break
+    
+    if display == True:
+        print_colored_board(board, solution)
 
     return FinishedGame(trials=len(board), speed=time.time() - start_simluation)
-    
+
+pegs = ['█', '░', '▓']
+colors = ['grey', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white']
+colored_pegs = list(itertools.product(pegs, colors))
+if len(colored_pegs) < num_colors:
+    raise ValueError('Number of colors too high for console print.')
+
+def print_colored_row(pegs: np.ndarray, hints: np.ndarray=None) -> None:
+    print(''.join(colored(*(colored_pegs[peg])) for peg in pegs), end=' ')
+    if hints is not None:
+        ccp = hints['correct_color_position']
+        cc = hints['correct_color']
+        print('●'*ccp + '○'*cc + ' '*(board_size-cc-ccp) , end=' ')
+
+def print_colored_board(board: list[dict[str, np.ndarray]], solution: np.ndarray) -> None:    
+    print('###########')
+    for i, row in enumerate(board):
+        print(i+1, end=' ')
+        print_colored_row(row['trial'], row['hints'])
+        print(f"{row['possibilities']}", end='')
+        print('')
+    print('-----------')
+    print('S', end=' ')
+    print_colored_row(solution)
+    print('')
+
 def print_game_stats(games: list[FinishedGame]) -> None:
     '''
     TODO
