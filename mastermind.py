@@ -2,11 +2,14 @@
 TODO
 '''
 
+import math
 import time
 import argparse
 import itertools
-from collections import namedtuple
+from typing import Generator
 from termcolor import colored
+from collections import namedtuple
+from collections import defaultdict
 
 import numpy as np
 from tqdm import tqdm
@@ -25,11 +28,17 @@ args = parser.parse_args()
 num_simulations = args.num_simulations
 board_size = args.board_size
 num_colors = args.num_colors
-num_colors = args.num_colors
 display = args.display
 
 FinishedGame = namedtuple('FinishedGame', 'trials speed')
 board = []
+possibilities = None
+
+def generate_first_trial() -> np.ndarray:
+    '''
+    TODO
+    '''
+    return np.minimum(np.arange(start=1, stop=board_size+1), np.full(shape=board_size, fill_value=num_colors))
 
 def generate_random_trial() -> np.ndarray:
     '''
@@ -83,28 +92,52 @@ def update_possibilities(possibilities: np.ndarray) -> np.ndarray:
 
     return new_possibilities
 
-def generate_random_trial_from_possibility(possibilities: np.ndarray) -> np.ndarray:
+def stringify_hints(hints: dict[str, int]) -> str:
+    return 'B'*hints['correct_color_position'] + 'W'*hints['correct_color']
+
+def generate_trials() -> Generator[np.ndarray, None, None]:
+    yield generate_first_trial()
+    while True:
+        yield generate_trial_entropy()
+
+def generate_trial_entropy() -> np.ndarray:
+    
+    entropies = []
+    possibilities_size = len(possibilities)
+    for possibility_1 in possibilities:
+        entropy = defaultdict(int)
+        for possibility_2 in possibilities:
+            hints = compute_hints(possibility_1, possibility_2)
+            hints = stringify_hints(hints)
+            entropy[hints] += 1
+        entropy_probs = [value / possibilities_size for value in entropy.values()]
+        H = - sum(prob * math.log(prob, 2) for prob in entropy_probs if prob > 0)
+        entropies.append(H)
+    
+    return possibilities[np.argmax(np.array(entropies))]
+
+def generate_trials_random() -> Generator[np.ndarray, None, None]:
     '''
     TODO
     '''
-
-    random_index = np.random.choice(possibilities.shape[0], replace=False)
-    return possibilities[random_index]
+    yield generate_first_trial()
+    while True:
+        random_index = np.random.choice(possibilities.shape[0], replace=False)
+        yield possibilities[random_index]
 
 def single_game() -> FinishedGame:
     '''
     TODO
     '''
     global board
+    global possibilities
 
     start_simluation = time.time()
 
     board = []
     solution = generate_random_trial()
     possibilities = np.array(list(itertools.product(range(1, num_colors+1), repeat=board_size)))
-    while True:
-        trial = generate_random_trial_from_possibility(possibilities)
-        
+    for trial in generate_trials():
         board.append(process_trial(trial, solution))
         board[-1]['possibilities'] = len(possibilities)
 
