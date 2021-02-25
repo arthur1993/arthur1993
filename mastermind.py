@@ -57,31 +57,19 @@ def compute_hints(trial: np.ndarray, solution: np.ndarray) -> dict:
     '''
     TODO
     '''
-
-    hints = {
-        'correct_color': 0,
-        'correct_color_position': 0,
-    }
-
-    hints['correct_color'] = np.minimum(count_per_color(trial), count_per_color(solution)).sum()
+    hints = 'W' * np.minimum(count_per_color(trial), count_per_color(solution)).sum()
 
     for peg_trial, peg_solution in zip(trial, solution):
         if peg_trial == peg_solution:
-            hints['correct_color'] -= 1
-            hints['correct_color_position'] += 1
-
+            hints = hints.replace('W', 'B', 1)
+    
     return hints
 
 def process_trial(trial: np.ndarray, solution: np.ndarray) -> dict[str, np.ndarray]:
     '''
     TODO
     '''
-    line = {
-        'trial': trial,
-        'hints': compute_hints(trial, solution)
-    }
-
-    return line
+    return dict(trial=trial, hints=compute_hints(trial, solution))
 
 def update_possibilities(possibilities: np.ndarray) -> np.ndarray:
     
@@ -91,9 +79,6 @@ def update_possibilities(possibilities: np.ndarray) -> np.ndarray:
     new_possibilities = np.array([possibility for possibility in possibilities if hints == compute_hints(trial, possibility)])
 
     return new_possibilities
-
-def stringify_hints(hints: dict[str, int]) -> str:
-    return 'B'*hints['correct_color_position'] + 'W'*hints['correct_color']
 
 def generate_trials() -> Generator[np.ndarray, None, None]:
     yield generate_first_trial()
@@ -108,7 +93,6 @@ def generate_trial_entropy() -> np.ndarray:
         entropy = defaultdict(int)
         for possibility_2 in possibilities:
             hints = compute_hints(possibility_1, possibility_2)
-            hints = stringify_hints(hints)
             entropy[hints] += 1
         entropy_probs = [value / possibilities_size for value in entropy.values()]
         H = - sum(prob * math.log(prob, 2) for prob in entropy_probs if prob > 0)
@@ -142,7 +126,7 @@ def single_game() -> FinishedGame:
         board[-1]['possibilities'] = len(possibilities)
 
         possibilities = update_possibilities(possibilities)
-        if board[-1]['hints']['correct_color_position'] == board_size:
+        if board[-1]['hints'] == 'B' * board_size:
             break
     
     if display == True:
@@ -159,9 +143,9 @@ if len(colored_pegs) < num_colors:
 def print_colored_row(pegs: np.ndarray, hints: np.ndarray=None) -> None:
     print(''.join(colored(*(colored_pegs[peg])) for peg in pegs), end=' ')
     if hints is not None:
-        ccp = hints['correct_color_position']
-        cc = hints['correct_color']
-        print('●'*ccp + '○'*cc + ' '*(board_size-cc-ccp) , end=' ')
+        hints = hints.replace('B', '●')
+        hints = hints.replace('W', '○')
+        print(f'{hints:4}', end=' ')
 
 def print_colored_board(board: list[dict[str, np.ndarray]], solution: np.ndarray) -> None:    
     print('###########')
