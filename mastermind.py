@@ -4,17 +4,17 @@ TODO
 
 import time
 import argparse
-from typing import Generator
+import itertools
 from collections import namedtuple
 
 import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
 
-parser = argparse.ArgumentParser("mastermind")
-parser.add_argument("--num_simulations", "-n", dest="num_simulations", type=int, default=1)
-parser.add_argument("--board-size", "-s", dest="board_size", type=int, default=4)
-parser.add_argument("--num-colors", "-c", dest="num_colors", type=int, default=7)
+parser = argparse.ArgumentParser('mastermind')
+parser.add_argument('--num_simulations', '-n', dest='num_simulations', type=int, default=1)
+parser.add_argument('--board-size', '-s', dest='board_size', type=int, default=4)
+parser.add_argument('--num-colors', '-c', dest='num_colors', type=int, default=7)
 
 args = parser.parse_args()
 
@@ -31,53 +31,11 @@ def generate_random_trial() -> np.ndarray:
     '''
     return np.random.randint(low=1, high=num_colors, size=board_size)
 
-def generate_empty_trial() -> np.ndarray:
-    '''
-    TODO
-    '''
-    return np.zeros(shape=board_size, dtype=int)
-
 def count_per_color(trial: np.ndarray) -> np.ndarray:
     '''
     TODO
     '''
-    return np.bincount(trial, minlength=num_colors)
-
-# Generation of a first try
-# In the case of a game of : size = 4, color = 7, it will generate the following board : [1,2,3,4]
-# This is used to maximise the information from the first try
-def generate_first_trial() -> np.ndarray:
-    '''
-    TODO
-    '''
-    return np.minimum(np.arange(start=1, stop=board_size+1), np.full(shape=board_size, fill_value=num_colors))
-
-# Maximizing the second try based on the information of the first one
-def generate_second_trial() -> np.ndarray:
-    '''
-    TODO
-    '''
-    last_trial = board[-1]['trial']
-    last_hints = board[-1]['hints']
-    cor_col = last_hints['correct_color']
-    cor_col_pos = last_hints['correct_color_position']
-
-    next_trial = generate_empty_trial()
-    next_trial[:cor_col_pos] = last_trial[:cor_col_pos]
-    for pos in range(cor_col_pos, cor_col_pos + cor_col):
-        if pos+1 < board_size:
-            next_trial[pos+1] = last_trial[pos]
-        else:
-            next_trial[cor_col_pos] = last_trial[pos]
-
-    for i, keg in enumerate(next_trial):
-        if not keg:
-            if board_size < num_colors:
-                next_trial[i] = np.random.randint(low=board_size+1, high=num_colors)
-            else:
-                next_trial[i] = np.random.randint(low=1, high=num_colors-1)
-
-    return next_trial
+    return np.bincount(trial, minlength=num_colors+1)
 
 # Computing hints for the current row
 def compute_hints(trial: np.ndarray, solution: np.ndarray) -> dict:
@@ -99,34 +57,6 @@ def compute_hints(trial: np.ndarray, solution: np.ndarray) -> dict:
 
     return hints
 
-def validate_trial(trial: np.ndarray) -> bool:
-    '''
-    TODO
-    '''
-
-    for line in reversed(board):
-        past_trial = line['trial']
-        past_hints = line['hints']
-
-        hypotetical_hints = compute_hints(trial, past_trial)
-        if past_hints != hypotetical_hints:
-            return False
-
-    return True
-
-# After the first two trys, this will generate a row that verifies all the previous equations
-def generate_trial() -> Generator[np.ndarray, None, None]:
-    '''
-    TODO
-    '''
-
-    yield generate_first_trial()
-    yield generate_second_trial()
-    while True:
-        trial = generate_random_trial()
-        if validate_trial(trial):
-            yield trial
-
 def process_trial(trial: np.ndarray, solution: np.ndarray) -> dict[str, np.ndarray]:
     '''
     TODO
@@ -138,20 +68,41 @@ def process_trial(trial: np.ndarray, solution: np.ndarray) -> dict[str, np.ndarr
 
     return line
 
+def update_possibilities(possibilities: np.ndarray) -> np.ndarray:
+    
+    trial = board[-1]['trial']
+    hints = board[-1]['hints']
+
+    new_possibilities = np.array([possibility for possibility in possibilities if hints == compute_hints(trial, possibility)])
+
+    return new_possibilities
+
+def generate_random_trial_from_possibility(possibilities: np.ndarray) -> np.ndarray:
+    '''
+    TODO
+    '''
+
+    random_index = np.random.choice(possibilities.shape[0], replace=False)
+    return possibilities[random_index]
+
 def single_game() -> FinishedGame:
     '''
     TODO
     '''
     global board
+
     start_simluation = time.time()
 
-    solution = generate_random_trial()
     board = []
-    for trial in generate_trial():
+    solution = generate_random_trial()
+    possibilities = np.array(list(itertools.product(range(1, num_colors+1), repeat=board_size)))
+    while len(possibilities) > 1:
+        trial = generate_random_trial_from_possibility(possibilities)
         board.append(process_trial(trial, solution))
-        if board[-1]['hints']['correct_color_position'] == board_size:
-            return FinishedGame(trials=len(board), speed=time.time() - start_simluation)
+        possibilities = update_possibilities(possibilities)
 
+    return FinishedGame(trials=len(board), speed=time.time() - start_simluation)
+    
 def print_game_stats(games: list[FinishedGame]) -> None:
     '''
     TODO
@@ -165,7 +116,7 @@ def print_game_stats(games: list[FinishedGame]) -> None:
     print(f'Variance time: {var_time:.2}')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     start_time = time.time()
 
     finished_games = [single_game() for _ in tqdm(range(num_simulations), desc = 'Processing simulations')]
